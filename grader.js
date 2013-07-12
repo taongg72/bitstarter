@@ -26,6 +26,7 @@ var program = require('commander');
 var cheerio = require('cheerio');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
+var rest = require('restler'); /* restler */
 
 var assertFileExists = function(infile) {
     var instr = infile.toString();
@@ -63,12 +64,53 @@ var clone = function(fn) {
 
 if(require.main == module) {
     program
-        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+        .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists)) //, HTMLFILE_DEFAULT)
+	.option('-u, --url <url>', 
+		'url of bitstarter', 
+		clone(function(url){
+			// console.log("Getting response from: "+url);
+			rest.get(url).on('complete', function(result, response) {
+        			if (result instanceof Error) {
+            				console.error('Error: ' + util.format(response.message));
+        			}
+				 else {
+					//return url.toString();
+            				//console.error("Read/n============== %s /n============",url);
+        			}
+    			})
+			return url.toString();
+		}) ) //, 
+		//"http://pure-garden-2188.herokuapp.com/")
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
-} else {
+
+	if (program.file) {
+		var checkJson = checkHtmlFile(program.file, program.checks);
+		var outJson = JSON.stringify(checkJson, null, 4);
+	    	console.log(outJson);
+    	}
+
+	if (program.url) {
+		//console.log(program.url+program.file+program.checks);
+		rest.get(program.url).on('complete', function(result, response) {
+	        	if (result instanceof Error) {
+	                	console.error('Error: ' + util.format(response.message));
+			}
+			else {
+				//console.error("Read: %s", result);
+				$ = cheerio.load(result);
+				var checks = loadChecks(program.checks).sort();
+				//console.log(checks);
+				var out = {};
+				for(var ii in checks) {
+					var present = $(checks[ii]).length > 0;
+					out[checks[ii]] = present;
+				}
+				console.log(JSON.stringify(out, null, 4));		
+			}
+		});  
+	}
+}
+else {
     exports.checkHtmlFile = checkHtmlFile;
 }
